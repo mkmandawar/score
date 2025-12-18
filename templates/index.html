@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RRB Marks & Rank Calculator</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8f9fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .hero-section { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 50px 0; border-radius: 0 0 20px 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .card { border: none; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; transition: transform 0.2s; }
+        .card:hover { transform: translateY(-2px); }
+        .btn-primary { background: #764ba2; border: none; padding: 10px 20px; border-radius: 8px; }
+        .btn-primary:hover { background: #5b3a7d; }
+        .score-box { text-align: center; padding: 20px; }
+        .score-value { font-size: 2.5rem; font-weight: bold; color: #764ba2; }
+        .rank-value { font-size: 2.5rem; font-weight: bold; color: #28a745; }
+        .stat-label { font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; color: #6c757d; }
+        .spinner-border { width: 3rem; height: 3rem; }
+    </style>
+</head>
+<body>
+
+<div class="hero-section text-center mb-5">
+    <h1>RRB Marks & Rank Calculator</h1>
+    <p class="lead">Enter your Answer Key URL to check your Score and Rank instantly.</p>
+</div>
+
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card p-4">
+                <form id="calcForm">
+                    <div class="mb-3">
+                        <label for="urlInput" class="form-label fw-bold">Answer Key URL</label>
+                        <input type="url" class="form-control form-control-lg" id="urlInput" placeholder="https://rrb.digialm.com/..." required>
+                        <div class="form-text">Paste the URL of your answer key response sheet here.</div>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100 fs-5">Calculate Score</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Spinner -->
+    <div id="loading" class="text-center my-5 d-none">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-2 text-muted">Fetching your answer key... This may take a moment.</p>
+    </div>
+
+    <!-- Results Section -->
+    <div id="results" class="d-none">
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card bg-white">
+                    <div class="card-body">
+                        <h4 class="card-title text-center mb-4">Candidate Details</h4>
+                        <div class="row text-center">
+                            <div class="col-md-6 mb-2"><strong>Name:</strong> <span id="candName"></span></div>
+                            <div class="col-md-6 mb-2"><strong>Roll Number:</strong> <span id="candRoll"></span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body score-box">
+                        <div class="stat-label">Your Score</div>
+                        <div class="score-value" id="scoreVal">0</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body score-box">
+                        <div class="stat-label">Your Rank</div>
+                        <div class="rank-value" id="rankVal">#0</div>
+                        <small class="text-muted">Out of <span id="totalRank">0</span> students</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card text-center p-3">
+                    <h5 class="text-success">Correct</h5>
+                    <h3 id="correctVal">0</h3>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card text-center p-3">
+                    <h5 class="text-danger">Wrong</h5>
+                    <h3 id="wrongVal">0</h3>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card text-center p-3">
+                    <h5 class="text-warning">Unattempted</h5>
+                    <h3 id="unattemptedVal">0</h3>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Leaderboard -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-white fw-bold">Top Rankers</div>
+                    <div class="card-body p-0">
+                        <table class="table table-striped mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Rank</th>
+                                    <th>Name</th>
+                                    <th>Score</th>
+                                </tr>
+                            </thead>
+                            <tbody id="leaderboardBody">
+                                <!-- Filled by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+document.getElementById('calcForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const url = document.getElementById('urlInput').value;
+    
+    // UI Updates
+    document.getElementById('loading').classList.remove('d-none');
+    document.getElementById('results').classList.add('d-none');
+    
+    try {
+        const response = await fetch('/api/fetch-score', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: url })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Update UI with Data
+            document.getElementById('candName').textContent = data.data.candidate_info['Candidate Name'];
+            document.getElementById('candRoll').textContent = data.data.candidate_info['Roll Number'];
+            
+            document.getElementById('scoreVal').textContent = data.data.score_summary.total_score;
+            document.getElementById('correctVal').textContent = data.data.score_summary.correct;
+            document.getElementById('wrongVal').textContent = data.data.score_summary.wrong;
+            document.getElementById('unattemptedVal').textContent = data.data.score_summary.unattempted;
+            
+            document.getElementById('rankVal').textContent = "#" + data.rank;
+            document.getElementById('totalRank').textContent = data.total_participants;
+            
+            // Populate Leaderboard
+            const tbody = document.getElementById('leaderboardBody');
+            tbody.innerHTML = '';
+            data.leaderboard.forEach((entry, index) => {
+                const row = `<tr>
+                    <td>#${index + 1}</td>
+                    <td>${entry[0]}</td> <!-- Name -->
+                    <td>${entry[1]}</td> <!-- Score -->
+                </tr>`;
+                tbody.innerHTML += row;
+            });
+
+            document.getElementById('results').classList.remove('d-none');
+        } else {
+            alert('Error: ' + data.message);
+        }
+    } catch (error) {
+        alert('An error occurred: ' + error.message);
+    } finally {
+        document.getElementById('loading').classList.add('d-none');
+    }
+});
+</script>
+
+</body>
+</html>
