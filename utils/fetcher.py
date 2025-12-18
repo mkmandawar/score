@@ -1,18 +1,22 @@
-import cloudscraper
+from playwright.sync_api import sync_playwright
 
-def fetch_url(url):
-    """
-    Fetches the content of the given URL using cloudscraper to bypass bot protection.
-    Returns the HTML content or None if failed.
-    """
-    scraper = cloudscraper.create_scraper()
-    try:
-        response = scraper.get(url)
-        if response.status_code == 200:
-            return response.text
-        else:
-            print(f"Failed to fetch URL. Status Code: {response.status_code}")
+def fetch_stealth(url):
+    with sync_playwright() as p:
+        # Launch browser with specific arguments to look human
+        browser = p.chromium.launch(headless=True)
+        context = browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
+        )
+        page = context.new_page()
+        
+        try:
+            # Navigate and wait for the main content table to load
+            response = page.goto(url, wait_until="networkidle", timeout=60000)
+            if response.status == 200:
+                return page.content()
             return None
-    except Exception as e:
-        print(f"Error fetching URL: {e}")
-        return None
+        except Exception as e:
+            print(f"Fetch failed: {e}")
+            return None
+        finally:
+            browser.close()
